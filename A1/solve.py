@@ -298,21 +298,30 @@ def heuristic_basic(board):
     :return: The heuristic value.
     :rtype: int
     """
-    boxes = board.boxes.copy()
-    available_storage = board.storage.copy()
-    #dictionary mapping a box to a storage point
     heuristic_val = 0
+    boxes = board.boxes
+    storage = board.storage
+    occupied_storage = set(storage).intersection(set(boxes))
+    pairs = {}
+    
+    for each in occupied_storage:
+        pairs[each] = each
+    #dictionary mapping a box to a storage point and the distance between them
 
     for box in boxes:
-        distances = [abs(box[0]-store[0])+abs(box[1]-store[1])
-                    for store in available_storage]
-        
-        #loop for finding the min distance storage point that hasn't been assigned
-        min_dist = min(distances)
-        heuristic_val += min_dist
-        min_index = distances.index(min_dist)
-        available_storage.pop(min_index)
-        #boxes.pop(min_index)
+         if box in pairs: continue
+
+         elif box not in pairs:
+             candidates = [store for store in storage if store not in pairs.values()]
+             distances = [abs(box[0]-store[0])+abs(box[1]-store[1]) for store in candidates]
+             min_dist = min(distances)
+             min_index = distances.index(min_dist)
+             assigned_store = candidates[min_index]
+             pairs[box] = assigned_store
+
+    for box in pairs:
+        distance = abs(box[0]-pairs[box][0]) + abs(box[1]-pairs[box][1])
+        heuristic_val += distance
 
     return heuristic_val
 
@@ -326,8 +335,6 @@ def heuristic_advanced(board):
     Args:
         board (_type_): Current board
     """
-    penalty={'corner':math.inf, 'wall_but_storage':1, 'wall_no_storage':math.inf,
-             'box_wall':2}
     heuristic = 0
     boxes = board.boxes
 
