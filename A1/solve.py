@@ -192,10 +192,9 @@ def fetch_successor(robot: tuple[int, int], move: tuple[int, int], state):
     successor.board.storage = list(successor.board.storage)
     successor.board.obstacles = list(successor.board.obstacles)
 
-    if state.hfn!=None:
-        #+1 for increase in depth
-        f_val = successor.depth + state.hfn(new_board)
-        successor.f = f_val
+    
+    f_val = successor.depth + state.hfn(new_board)
+    successor.f = f_val
 
     return successor
 
@@ -219,7 +218,7 @@ def dfs(init_board):
     :return: (the path to goal state, solution cost)
     :rtype: List[State], int
     """
-    init_state = State(board=init_board, hfn=None, f=0, depth=0,
+    init_state = State(board=init_board, hfn=lambda x: 0, f=0, depth=0,
                   parent=None)
     frontier = [init_state]
     explored=set()
@@ -277,7 +276,7 @@ def a_star(init_board, hfn):
             explored.add(state.board)
 
             if is_goal(state):
-                return get_path(state), state.depth, len(explored)
+                return get_path(state), state.depth
         
             else:
                 successors = get_successors(state)
