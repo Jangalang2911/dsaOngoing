@@ -159,6 +159,7 @@ def fetch_successor(robot: tuple[int, int], move: tuple[int, int], state):
         robot (tuple[int, int]): Position of robot
         move (tuple[int, int]): Position resulting from move
         state (State): Current state
+        hfn: Heuristic function
 
     Returns:
         State: The state resulting from move
@@ -166,7 +167,9 @@ def fetch_successor(robot: tuple[int, int], move: tuple[int, int], state):
     new_board = Board(state.board.name, state.board.width, state.board.height,
                       state.board.robots.copy(), state.board.boxes.copy(),
                       state.board.storage.copy(), state.board.obstacles.copy())
-    successor = State(new_board, state.hfn, state.f-1, state.depth+1, state)
+    
+    successor = State(board=new_board, hfn=state.hfn, f=0, depth=state.depth+1, 
+                      parent=state)
     successor.board.boxes = set(successor.board.boxes)    
     successor.board.robots = set(successor.board.robots)
     successor.board.storage = set(successor.board.storage)
@@ -183,8 +186,18 @@ def fetch_successor(robot: tuple[int, int], move: tuple[int, int], state):
     successor.board.robots.remove(robot)
     successor.board.robots.add(move)
 
-    return successor
 
+    successor.board.boxes = list(successor.board.boxes)    
+    successor.board.robots = list(successor.board.robots)
+    successor.board.storage = list(successor.board.storage)
+    successor.board.obstacles = list(successor.board.obstacles)
+
+    if state.hfn!=None:
+        #+1 for increase in depth
+        f_val = successor.depth + state.hfn(new_board)
+        successor.f = f_val
+
+    return successor
 
 
 #########################################################################
@@ -213,9 +226,7 @@ def dfs(init_board):
     
     while not len(frontier)==0:
         state = frontier.pop()
-        print(state.board)
         
-
         if state.board in explored: 
             continue
 
@@ -257,7 +268,6 @@ def a_star(init_board, hfn):
     
     while not len(frontier)==0:
         state = heappop(frontier)
-        print(state.board)
         
 
         if state.board in explored: 
@@ -267,7 +277,7 @@ def a_star(init_board, hfn):
             explored.add(state.board)
 
             if is_goal(state):
-                return get_path(state), state.depth
+                return get_path(state), state.depth, len(explored)
         
             else:
                 successors = get_successors(state)
@@ -298,25 +308,17 @@ def heuristic_basic(board):
         distances = [abs(box[0]-store[0])+abs(box[1]-store[1])
                     for store in available_storage]
         
+        #loop for finding the min distance storage point that hasn't been assigned
         min_dist = min(distances)
         heuristic_val += min_dist
         min_index = distances.index(min_dist)
         available_storage.pop(min_index)
-        boxes.pop(min_index)
+        #boxes.pop(min_index)
 
     return heuristic_val
 
 
 def heuristic_advanced(board):
-    """
-    An advanced heuristic of your own choosing and invention.
-
-    :param board: The current board.
-    :type board: Board
-    :return: The heuristic value.
-    :rtype: int
-    """
-
     """
     Returns heuristic value for the given board based on the number of deadlocks.
     A deadlock is a position which makes the board unsolvable.
