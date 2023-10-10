@@ -13,6 +13,7 @@ from heapq import heappush, heappop
 import time
 import argparse
 import math # for infinity
+import line_profiler
 
 from board import *
 
@@ -50,25 +51,19 @@ def get_path(state):
     :return: The path.
     :rtype: List[State]
     """
-    return recursive_trace(state, [])
-
-
-
-def recursive_trace(state, path: list):
-    if state.parent==None:
+    path = []
+    while state is not None:
         path.append(state)
-        return path
+        state = state.parent
     
-    else:
-        path = recursive_trace(state.parent, path)
-        path.append(state)
-        return path
+    path.reverse()
+    return path
 
 
 #########################################################################
 #Move Functions
 
-
+#@profile
 def get_successors(state):
     """
     Return a list containing the successor states of the given state.
@@ -91,27 +86,6 @@ def get_successors(state):
     return successor_states
 
 
-def neighbourhood(position: tuple[int, int], board):
-    """
-    Returns a list containing the neighbourhood of the
-    entity at the given position
-
-    Args:
-        position (tuple[int, int]): Position of the entity
-        board (_type_): Current board
-
-    Returns:
-        list[tuple[int, int]]: List of the neighbouring coordinates 
-        for an entity
-    """
-    neighbourhood = set()
-    neighbourhood.add((position[0]+1, position[1]))
-    neighbourhood.add((position[0]-1, position[1]))
-    neighbourhood.add((position[0], position[1]+1))
-    neighbourhood.add((position[0], position[1]-1))
-        
-    return neighbourhood
-
 
 def identify_moves(robot: tuple[int, int], state):
     """
@@ -125,31 +99,28 @@ def identify_moves(robot: tuple[int, int], state):
     Returns:
         list[tuple[int, int]]: List of the possible moves 
     """
-    robot_nbd = neighbourhood(robot, state.board)
+    robot_nbd = [(robot[0]+1, robot[1]),(robot[0]-1, robot[1]),
+                     (robot[0], robot[1]+1), (robot[0], robot[1]-1)]
+    obstacles = state.board.obstacles
+    boxes = state.board.boxes
+    invalid = obstacles + state.board.robots
 
-    #accounting for obstacles in robot's neighbourhood
-    robot_nbd -= set(state.board.obstacles)
+    #accounting for obstacles and other robots in robot's neighbourhood
+    robot_nbd = [pos for pos in robot_nbd if pos not in invalid]
+    adj_box = [pos for pos in robot_nbd if pos in boxes]
 
 
     #robot->box->wall: movement not possible
-    robot_adjacent = robot_nbd.intersection(set(state.board.boxes))
-    for box in robot_adjacent:
-        #box_nbd: set containing obstacles adjacent to box
-        box_nbd=neighbourhood(box, state.board).intersection(
-            set(state.board.obstacles))
+    for box in adj_box:   
+        direction=(box[0]-robot[0], box[1]-robot[1])
+        two = (robot[0]+2*direction[0], robot[1]+2*direction[1])
+        if two in obstacles or two in boxes:
+            robot_nbd.remove(box)
 
-        #if robot->box->wall, then direction(r->b)=direction(b->w)
-        direction=(robot[0]-box[0], robot[1]-box[1])
-
-        invalid_check=[(box[0]-obs[0], box[1]-obs[1])==direction 
-                          for obs in box_nbd]
         
-        if True in invalid_check:
-            robot_nbd -= set([box])
-
     return list(robot_nbd)
 
-
+#@profile
 def fetch_successor(robot: tuple[int, int], move: tuple[int, int], state):
     """
     Returns the successor for the provided state, given the position 
@@ -168,12 +139,7 @@ def fetch_successor(robot: tuple[int, int], move: tuple[int, int], state):
                       state.board.robots.copy(), state.board.boxes.copy(),
                       state.board.storage.copy(), state.board.obstacles.copy())
     
-    successor = State(board=new_board, hfn=state.hfn, f=0, depth=state.depth+1, 
-                      parent=state)
-    successor.board.boxes = set(successor.board.boxes)    
-    successor.board.robots = set(successor.board.robots)
-    successor.board.storage = set(successor.board.storage)
-    successor.board.obstacles = set(successor.board.obstacles)
+    successor = State(new_board, state.hfn, 0, state.depth+1, state)
 
     #move results in pushing a box
     if move in successor.board.boxes:
@@ -181,16 +147,11 @@ def fetch_successor(robot: tuple[int, int], move: tuple[int, int], state):
         box_update = (move[0]-direction[0], move[1]-direction[1])
 
         successor.board.boxes.remove(move) #move and box refer to the same position
-        successor.board.boxes.add(box_update)
+        successor.board.boxes.append(box_update)
 
     successor.board.robots.remove(robot)
-    successor.board.robots.add(move)
+    successor.board.robots.append(move)
 
-
-    successor.board.boxes = list(successor.board.boxes)    
-    successor.board.robots = list(successor.board.robots)
-    successor.board.storage = list(successor.board.storage)
-    successor.board.obstacles = list(successor.board.obstacles)
 
     
     f_val = successor.depth + state.hfn(new_board)
@@ -203,7 +164,7 @@ def fetch_successor(robot: tuple[int, int], move: tuple[int, int], state):
 # Search Algorithms 
     
 
-
+#@profile
 def dfs(init_board):
     """
     Run the DFS algorithm given an initial board.
@@ -225,11 +186,8 @@ def dfs(init_board):
     
     while not len(frontier)==0:
         state = frontier.pop()
-        
-        if state.board in explored: 
-            continue
 
-        elif state.board not in explored:
+        if state.board not in explored:
             explored.add(state.board)
 
             if is_goal(state):
@@ -242,7 +200,7 @@ def dfs(init_board):
     return [], -1
     
 
-
+#@profile
 def a_star(init_board, hfn):
     """
     Run the A_star search algorithm given an initial board and a heuristic function.
@@ -262,17 +220,13 @@ def a_star(init_board, hfn):
     f_val = hfn(init_board)
     init_state = State(board=init_board, hfn=hfn, f=f_val, depth=0,
                   parent=None)
-    frontier = [init_state]
+    frontier = [(f_val, init_state)]
     explored=set()
     
     while not len(frontier)==0:
-        state = heappop(frontier)
-        
+        _, state = heappop(frontier)
 
-        if state.board in explored: 
-            continue
-
-        elif state.board not in explored:
+        if state.board not in explored:
             explored.add(state.board)
 
             if is_goal(state):
@@ -281,10 +235,10 @@ def a_star(init_board, hfn):
             else:
                 successors = get_successors(state)
                 for successor in successors:
-                    heappush(frontier, successor)
+                    heappush(frontier, (successor.f, successor))
     return [], -1
 
-
+#@profile
 def heuristic_basic(board):
     """
     Returns the heuristic value for the given board
@@ -298,34 +252,25 @@ def heuristic_basic(board):
     :return: The heuristic value.
     :rtype: int
     """
-    heuristic_val = 0
-    boxes = board.boxes
+    heuristic = 0
     storage = board.storage
-    occupied_storage = set(storage).intersection(set(boxes))
-    pairs = {}
-    
-    for each in occupied_storage:
-        pairs[each] = each
-    #dictionary mapping a box to a storage point and the distance between them
+    boxes = board.boxes
+    occupied = set(storage).intersection(boxes)
+    available_storage = [store for store in storage if store not in occupied]
+    remaining_boxes = [box for box in boxes if box not in occupied]
 
-    for box in boxes:
-         if box in pairs: continue
+    while len(remaining_boxes)!=0:
+        box = remaining_boxes.pop()
+        distances = [abs(box[0]-store[0])+abs(box[1]-store[1]) for store in available_storage]
+        min_dist = min(distances)
+        heuristic += min_dist
+        min_index = distances.index(min_dist)
+        available_storage.pop(min_index)
 
-         elif box not in pairs:
-             candidates = [store for store in storage if store not in pairs.values()]
-             distances = [abs(box[0]-store[0])+abs(box[1]-store[1]) for store in candidates]
-             min_dist = min(distances)
-             min_index = distances.index(min_dist)
-             assigned_store = candidates[min_index]
-             pairs[box] = assigned_store
-
-    for box in pairs:
-        distance = abs(box[0]-pairs[box][0]) + abs(box[1]-pairs[box][1])
-        heuristic_val += distance
-
-    return heuristic_val
+    return heuristic
 
 
+#@profile
 def heuristic_advanced(board):
     """
     Returns heuristic value for the given board based on the number of deadlocks.
@@ -338,12 +283,11 @@ def heuristic_advanced(board):
     heuristic = 0
     boxes = board.boxes
 
-    corners = [is_corner(box, board) for box in boxes]
-    heuristic = heuristic_basic(board)
-    if any(corners):
-        heuristic+= math.inf
+    for box in boxes:
+        if is_corner(box, board):
+            return math.inf
 
-    return heuristic
+    return heuristic_basic(board)
 
 
 
@@ -358,7 +302,8 @@ def is_corner(box: tuple[int, int], board):
     Args:
         box (tuple[int, int]): Position of box
     """
-    box_nbd = neighbourhood(box, board)
+    box_nbd = set([(box[0]+1, box[1]),(box[0]-1, box[1]),
+                     (box[0], box[1]+1), (box[0], box[1]-1)])
     storage = board.storage
     surrounding =  box_nbd.intersection(set(board.obstacles))
     surrounding = surrounding.intersection(set(board.boxes))
@@ -374,19 +319,6 @@ def is_corner(box: tuple[int, int], board):
         direction1 = (box[0]-wall1[0], box[1]-wall1[1])
         if direction0!=direction1:
             return True
-        
-
-    #along a wall, leading to a corner
-    if len(surrounding)==1 and surrounding[0] in board.obstacles and box not in storage:
-        direction = (box[0]-surrounding [0], box[1]-surrounding [1])
-        if direction in [(1, 0), (-1, 0)]:
-            check_storage =[True for store in board.storage if box[0]==store[0]]
-            if not any(check_storage):
-                return True
-        elif direction in [(0, 1), (0,-1)]:
-            check_storage = [True for store in board.storage if box[1]==store[1]]
-            if not any(check_storage):
-                return True
 
     return False
 
