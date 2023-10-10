@@ -13,7 +13,6 @@ from heapq import heappush, heappop
 import time
 import argparse
 import math # for infinity
-import line_profiler
 
 from board import *
 
