@@ -252,16 +252,13 @@ def heuristic_basic(board):
     :rtype: int
     """
     heuristic = 0
-    available_storage = board.storage.copy()
+    storage = board.storage
     boxes = board.boxes
-    
 
     for box in boxes:
-        distances = [abs(box[0]-store[0])+abs(box[1]-store[1]) for store in available_storage]
+        distances = [abs(box[0]-store[0])+abs(box[1]-store[1]) for store in storage]
         min_dist = min(distances)
         heuristic += min_dist
-        min_index = distances.index(min_dist)
-        available_storage.pop(min_index)
 
     return heuristic
 
