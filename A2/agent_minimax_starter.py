@@ -6,6 +6,7 @@
 ###############################################################################
 from mancala_game import Board, play_move
 from utils import *
+import math
 
 
 def minimax_max_basic(board, curr_player, heuristic_func):
@@ -19,8 +20,26 @@ def minimax_max_basic(board, curr_player, heuristic_func):
     :param heuristic_func: the heuristic function
     :return the best move and its minimax value according to minimax search.
     """
+    # 1. check if state terminal
+    # 2. if not, init best move, best value
+    # 3. for board resulting from each move, calculate 
+    # minimax_min_basic
+    # 4. return best_move and best_value
+    if len(board.pockets[0])==0 or len(board.pockets[1])==0:
+        return heuristic_func(board)
+    
+    best_move, best_value = None, -float(math.inf)
 
-    raise NotImplementedError
+    moves = board.get_possible_moves(curr_player)
+    for move in moves:
+        value = minimax_min_basic(board, 1-curr_player)
+        if value > best_value:
+            best_value = value
+            best_move = move
+
+    return best_move, best_value
+
+
 
 
 def minimax_min_basic(board, curr_player, heuristic_func):
@@ -35,7 +54,19 @@ def minimax_min_basic(board, curr_player, heuristic_func):
     :return the best move and its minimax value according to minimax search.
     """
 
-    raise NotImplementedError
+    if len(board.pockets[0])==0 or len(board.pockets[1])==0:
+        return heuristic_func(board)
+    
+    best_move, best_value = None, -float(math.inf)
+
+    moves = board.get_possible_moves(curr_player)
+    for move in moves:
+        value = minimax_max_basic(board, 1-curr_player)
+        if value > best_value:
+            best_value = value
+            best_move = move
+
+    return best_move, best_value
 
 
 def minimax_max_limit(board, curr_player, heuristic_func, depth_limit):

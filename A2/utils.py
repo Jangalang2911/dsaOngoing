@@ -45,7 +45,7 @@ def heuristic_basic(board, player):
     :return: an estimated utility of the current board for the current player.
     """
 
-    raise NotImplementedError
+    return board.mancalas[player] - board.mancalas[1-player]
 
 
 def heuristic_advanced(board, player): 
