@@ -1,4 +1,10 @@
 class Solution(object):
+    #Arrays No.38
+    ############
+    #More Optimal Solutions:
+    # 1. Use regex
+    # 2. Itertools.groups
+
     def countAndSay(self, n):
         """
         :type n: int
